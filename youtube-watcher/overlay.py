@@ -227,9 +227,11 @@ class CEOOverlay:
 
         animate()
 
-    def slide_out(self):
+    def slide_out(self, on_complete=None):
         self.stop_animation()
         if self.is_animating or not self.is_visible:
+            if on_complete:
+                self.root.after(0, on_complete)
             return
         self.is_animating = True
         current_y = [self.shown_y]
@@ -245,6 +247,8 @@ class CEOOverlay:
                     f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}+{self.pos_x}+{self.hidden_y}")
                 self.is_visible   = False
                 self.is_animating = False
+                if on_complete:
+                    self.root.after(0, on_complete)
 
         animate()
 
@@ -255,14 +259,14 @@ class CEOOverlay:
         self.is_animating = False
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}+{self.pos_x}+{self.hidden_y}")
 
-    def show_with_voice(self, speech_text, speak_fn):
+    def show_with_voice(self, speech_text, speak_fn, on_finished=None):
         def after_slide_in():
             self.start_animation()
 
             def speak_then_slideout():
                 speak_fn(speech_text)
                 self.root.after(0, self.stop_animation)
-                self.root.after(800, self.slide_out)
+                self.root.after(800, lambda: self.slide_out(on_complete=on_finished))
 
             thread = threading.Thread(target=speak_then_slideout, daemon=True)
             thread.start()

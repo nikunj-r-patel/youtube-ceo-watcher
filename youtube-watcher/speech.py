@@ -98,6 +98,12 @@ def speak(text):
         except Exception as e:
             print(f"TTS error: {e}")
 
+def speak_character_closed_bye():
+    """Play cute cartoon character voice saying 'Closed! Bye bye!' asynchronously."""
+    p = os.path.join(AUDIO_DIR, "character_closed_bye.mp3")
+    if os.path.exists(p):
+        threading.Thread(target=lambda: play_audio_file(p), daemon=True).start()
+
 def setup():
     """Ensure audio directory exists."""
     os.makedirs(AUDIO_DIR, exist_ok=True)

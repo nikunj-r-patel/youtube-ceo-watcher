@@ -316,8 +316,14 @@ class OrangeTabEnforcer:
             # Step 5: Brief standing victory pose
             celeb_x = self.target_x - (self.char_w // 2)
             self._render("celebrate", celeb_x, self.base_y - 4)
-            # After 500ms, start walking left off-screen
-            self.root.after(500, self._start_exit_left)
+            # Character voice: "Closed! Bye bye!"
+            try:
+                from speech import speak_character_closed_bye
+                speak_character_closed_bye()
+            except Exception as e:
+                print(f"Character voice error: {e}")
+            # After 850ms, start walking left off-screen
+            self.root.after(850, self._start_exit_left)
             
         # 100ms anticipation pause before leaping
         self.root.after(100, start_jump)
