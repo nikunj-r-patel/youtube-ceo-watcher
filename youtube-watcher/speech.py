@@ -24,6 +24,7 @@ FUNNY_LINES = [
     "Every second you spend on YouTube is a second I am losing MONEY! CLOSE IT!",
     "Do you think this company runs on YouTube views?! GET BACK TO WORK!",
     "I am calling your mother! She will hear about this YouTube business!",
+    "ANOTHER YouTube tab?! Are you SERIOUS?! I saw that second tab! Close it NOW!!",
     "THAT IS IT! I warned you TWICE! Tab CLOSED!",
     "THAT IS IT! I warned you! Tab CLOSED!",
 ]

@@ -135,10 +135,10 @@ class OrangeTabEnforcer:
         self._load_frames()
         
         # Character dimensions & nose offset
-        self.char_w = 56
-        self.char_h = 52
-        self.nose_offset_x = 46
-        self.nose_offset_y = 48
+        self.char_w = 48
+        self.char_h = 54
+        self.nose_offset_x = 42
+        self.nose_offset_y = 44
         
         # Position states
         self.current_x = -50.0  # Start just off the left edge for a clean entrance

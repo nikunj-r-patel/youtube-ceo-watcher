@@ -55,19 +55,21 @@ def find_youtube_window():
 # -----------------------------------------------
 class YouTubeWatcher:
     def __init__(self, overlay, speak_fn, get_line_fn):
-        self.overlay       = overlay
-        self.speak_fn      = speak_fn
-        self.get_line_fn   = get_line_fn
-        self.last_trigger  = 0
-        self.running       = False
-        self._thread       = None
-        self.warning_count = 0   # Track number of CEO warnings
+        self.overlay         = overlay
+        self.speak_fn        = speak_fn
+        self.get_line_fn     = get_line_fn
+        self.last_trigger    = 0
+        self.running         = False
+        self._thread         = None
+        self.warning_count   = 0     # Track number of warnings
+        self.tab_just_closed = False # Flags if character just closed a tab
 
     def _check_loop(self):
         print(f"\n🔍 YouTube Watcher is ACTIVE!")
         print(f"   Checking every {CHECK_INTERVAL} seconds...")
         print(f"   Cooldown: {COOLDOWN_SECONDS}s")
-        print(f"   Escalation: After 2 CEO warnings, Orange Tab Enforcer closes YouTube!\n")
+        print(f"   Logic: CEO warns once. Next infraction: 3D character closes tab (CEO voice OFF).")
+        print(f"   If 2nd tab exists: CEO voice turns ON to confront the 2nd tab!\n")
 
         while self.running:
             now           = time.time()
@@ -81,42 +83,49 @@ class YouTubeWatcher:
                     is_open, hwnd, title = find_youtube_window()
                     if is_open:
                         self.last_trigger = time.time()
-                        self.warning_count += 1
                         print(f"  🎯 YouTube detected: '{title[:60]}'")
                         
-                        if self.warning_count <= 1:
-                            # Warning 1: Standard CEO warning
-                            print(f"\n⚠️ WARNING {self.warning_count}/1: CEO is coming to warn you!")
+                        if self.tab_just_closed:
+                            # 2nd YouTube tab is open after 1st was closed!
+                            # CEO voice is ON specifically for the 2nd tab!
+                            print(f"\n🚨 2ND YOUTUBE TAB DETECTED! CEO voice is ON!")
+                            second_tab_line = "ANOTHER YouTube tab?! Are you SERIOUS?! I saw that second tab! Close it NOW!!"
+                            self._trigger_ceo(line=second_tab_line)
+                            self.tab_just_closed = False
+                            self.warning_count = 1
+                        elif self.warning_count == 0:
+                            # Warning 1: Standard CEO warning (Voice ON)
+                            self.warning_count = 1
+                            print(f"\n⚠️ WARNING 1: CEO is coming to warn you! (Voice ON)")
                             self._trigger_ceo()
                         else:
-                            # Warning 2: Escalation! Orange character closes the tab!
-                            print(f"\n🚨 ESCALATION: CEO already warned! Orange Tab Enforcer ACTIVATED!")
-                            print("🏃 Orange Tab Enforcer is walking to the YouTube tab to close it!")
+                            # Warning 2: 3D Character comes to close tab (CEO voice OFF!)
+                            print(f"\n🏃 3D Character ACTIVATED to close the YouTube tab! (CEO voice OFF)")
                             self._trigger_tab_enforcer(hwnd)
-                            # Reset count after closing tab so cycle repeats on future infractions
                             self.warning_count = 0
                     else:
                         print(f"   ✅ No YouTube open.\n")
+                        self.tab_just_closed = False
                 except Exception as e:
                     print(f"   ⚠️  Check error: {e}")
 
             time.sleep(CHECK_INTERVAL)
 
-    def _trigger_ceo(self):
-        """Show CEO cartoon and speak funny line."""
-        line = self.get_line_fn()
+    def _trigger_ceo(self, line=None):
+        """Show CEO cartoon and speak funny line (Voice ON)."""
+        if line is None:
+            line = self.get_line_fn()
         print(f"😤 CEO says: {line}\n")
         self.overlay.root.after(0, lambda: self.overlay.show_with_voice(line, self.speak_fn))
 
     def _trigger_tab_enforcer(self, hwnd):
-        """Trigger orange character walking on tab bar to close YouTube tab."""
-        def launch():
-            # Speak an angry CEO dismissal line concurrently
-            final_line = "THAT IS IT! I warned you! Tab CLOSED!"
-            threading.Thread(target=lambda: self.speak_fn(final_line), daemon=True).start()
+        """Trigger 3D character walking on tab bar to close YouTube tab. (CEO voice is OFF!)"""
+        def on_closed():
+            self.tab_just_closed = True
             
-            # Launch the walking enforcer on the tab strip
-            OrangeTabEnforcer(hwnd=hwnd)
+        def launch():
+            # CEO voice is strictly OFF while character is coming!
+            OrangeTabEnforcer(hwnd=hwnd, on_finished=on_closed)
 
         self.overlay.root.after(0, launch)
 
