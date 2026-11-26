@@ -50,6 +50,14 @@ def get_audio_path_for_line(text):
         return p
     return None
 
+def stop_speech():
+    """Immediately halt all audio playback."""
+    try:
+        mci = ctypes.windll.winmm.mciSendStringW
+        mci("close all", None, 0, 0)
+    except Exception:
+        pass
+
 def play_audio_file(file_path):
     """Play MP3 file via Windows MCI (built into winmm.dll, 100% offline, zero lag)."""
     try:
@@ -98,6 +106,5 @@ def setup():
 if __name__ == "__main__":
     setup()
     line = get_random_line()
-    print(f"\n😤 Speaking (Male CEO): {line}")
+    print(f"Testing line: {line}")
     speak(line)
-    print("Done!")

@@ -248,6 +248,13 @@ class CEOOverlay:
 
         animate()
 
+    def hide_immediately(self):
+        """Immediately hide CEO overlay off-screen with zero transition or animation."""
+        self.stop_animation()
+        self.is_visible = False
+        self.is_animating = False
+        self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}+{self.pos_x}+{self.hidden_y}")
+
     def show_with_voice(self, speech_text, speak_fn):
         def after_slide_in():
             self.start_animation()

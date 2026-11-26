@@ -68,8 +68,8 @@ class YouTubeWatcher:
         print(f"\n🔍 YouTube Watcher is ACTIVE!")
         print(f"   Checking every {CHECK_INTERVAL} seconds...")
         print(f"   Cooldown: {COOLDOWN_SECONDS}s")
-        print(f"   Logic: CEO warns once. Next infraction: 3D character closes tab (CEO voice OFF).")
-        print(f"   If 2nd tab exists: CEO voice turns ON to confront the 2nd tab!\n")
+        print(f"   Rule 1: When character comes, CEO is NOT displayed and CEO voice is OFF.")
+        print(f"   Rule 2: If 2nd YouTube tab exists, CEO displays and CEO voice turns ON!\n")
 
         while self.running:
             now           = time.time()
@@ -87,22 +87,16 @@ class YouTubeWatcher:
                         
                         if self.tab_just_closed:
                             # 2nd YouTube tab is open after 1st was closed!
-                            # CEO voice is ON specifically for the 2nd tab!
+                            # CEO voice and display are ON specifically for the 2nd tab!
                             print(f"\n🚨 2ND YOUTUBE TAB DETECTED! CEO voice is ON!")
                             second_tab_line = "ANOTHER YouTube tab?! Are you SERIOUS?! I saw that second tab! Close it NOW!!"
                             self._trigger_ceo(line=second_tab_line)
                             self.tab_just_closed = False
-                            self.warning_count = 1
-                        elif self.warning_count == 0:
-                            # Warning 1: Standard CEO warning (Voice ON)
-                            self.warning_count = 1
-                            print(f"\n⚠️ WARNING 1: CEO is coming to warn you! (Voice ON)")
-                            self._trigger_ceo()
                         else:
-                            # Warning 2: 3D Character comes to close tab (CEO voice OFF!)
-                            print(f"\n🏃 3D Character ACTIVATED to close the YouTube tab! (CEO voice OFF)")
+                            # 3D Character comes directly to close the tab!
+                            # CEO must NOT display, and CEO voice must NOT play!
+                            print(f"\n🏃 3D Character ACTIVATED to close the YouTube tab! (CEO hidden, CEO voice OFF)")
                             self._trigger_tab_enforcer(hwnd)
-                            self.warning_count = 0
                     else:
                         print(f"   ✅ No YouTube open.\n")
                         self.tab_just_closed = False
@@ -112,19 +106,25 @@ class YouTubeWatcher:
             time.sleep(CHECK_INTERVAL)
 
     def _trigger_ceo(self, line=None):
-        """Show CEO cartoon and speak funny line (Voice ON)."""
+        """Show CEO cartoon and speak funny line (Voice ON for 2nd tab)."""
         if line is None:
             line = self.get_line_fn()
         print(f"😤 CEO says: {line}\n")
         self.overlay.root.after(0, lambda: self.overlay.show_with_voice(line, self.speak_fn))
 
     def _trigger_tab_enforcer(self, hwnd):
-        """Trigger 3D character walking on tab bar to close YouTube tab. (CEO voice is OFF!)"""
+        """Trigger 3D character walking on tab bar to close YouTube tab. (CEO NOT displayed, CEO voice OFF!)"""
         def on_closed():
             self.tab_just_closed = True
             
         def launch():
-            # CEO voice is strictly OFF while character is coming!
+            # Guarantee CEO is completely hidden and audio is silent while character comes
+            self.overlay.hide_immediately()
+            try:
+                from speech import stop_speech
+                stop_speech()
+            except Exception:
+                pass
             OrangeTabEnforcer(hwnd=hwnd, on_finished=on_closed)
 
         self.overlay.root.after(0, launch)
@@ -161,10 +161,9 @@ def main():
 
     watcher.start()
 
-    print("💡 Status:")
-    print("   1. Open YouTube → Warning 1 (CEO yells)")
-    print("   2. YouTube still open → Warning 2 (CEO yells again)")
-    print("   3. YouTube still open → Orange Enforcer WALKS on tab bar & CLOSES it!")
+    print("💡 Rules:")
+    print("   1. Open YouTube → Character walks on tab bar & closes it (CEO NOT displayed, CEO voice OFF)")
+    print("   2. If 2nd YouTube tab is open → CEO displays and CEO voice turns ON!")
     print("💡 Press Ctrl+C to quit\n")
 
     try:
