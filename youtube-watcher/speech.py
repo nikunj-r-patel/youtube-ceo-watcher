@@ -24,6 +24,7 @@ FUNNY_LINES = [
     "Every second you spend on YouTube is a second I am losing MONEY! CLOSE IT!",
     "Do you think this company runs on YouTube views?! GET BACK TO WORK!",
     "I am calling your mother! She will hear about this YouTube business!",
+    "THAT IS IT! I warned you TWICE! Tab CLOSED!",
 ]
 
 AUDIO_DIR = os.path.join(os.path.dirname(__file__), "assets", "audio")

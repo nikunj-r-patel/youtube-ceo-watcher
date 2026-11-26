@@ -38,7 +38,8 @@
 - **🎯 Cross-Browser Detection**: Detects YouTube whether you're browsing the homepage or playing any full-screen / titled video across Mozilla Firefox, Google Chrome, Microsoft Edge, Brave, Opera, etc.
 - **👁️ Dynamic Face & Eye Animation**: While speaking, the cartoon CEO's face pulses and zooms in, making his bulging eyes look huge and comedic.
 - **🔊 Deep Male CEO Voice**: Pre-rendered high-quality authoritative male executive voice clips that play instantly with zero lag and 100% offline.
-- **🔀 Anti-Repeat Shuffled Deck**: Cycles through all 15 hilarious lines without repeating any line twice until the entire deck has been used.
+- **🏃 2-Strike Tab Enforcer (NEW!)**: After the CEO warns the user twice, on the 3rd infraction an orange character walks right across the browser's top tab bar, stomps the YouTube tab's **[X]** button, and cleanly closes the tab (`Ctrl+W`)!
+- **🔀 Anti-Repeat Shuffled Deck**: Cycles through all hilarious lines without repeating any line twice until the entire deck has been used.
 - **📐 Taskbar-Aware Positioning**: Automatically queries the Windows API (`SystemParametersInfoW`) to detect the taskbar height and rest right on top of it — no cutoffs!
 - **👆 Click to Dismiss**: Need him to leave in a hurry? Just click on him!
 - **⏱️ Smart Cooldown**: 10-second cooldown between detections prevents annoying pop-up spam.
@@ -66,14 +67,15 @@
 youtube-watcher/
 ├── assets/
 │   ├── cartoon.png          # Transparent angry CEO character
-│   └── audio/               # 15 pre-rendered Male CEO voice MP3 clips
-│       ├── line_03fdda7908.mp3
-│       ├── line_06c10ee0c0.mp3
-│       └── ...
-├── main.py                  # Main controller & background YouTube detector
-├── overlay.py               # Tkinter overlay window & zoom animation
+│   ├── orange_character.png # Transparent orange tab enforcer character
+│   ├── orange_frames/       # Walking, jumping, stomping animation frames
+│   └── audio/               # Pre-rendered Male CEO voice MP3 clips
+├── main.py                  # Main controller, detection & 2-strike escalation
+├── overlay.py               # Tkinter CEO overlay & zoom animation
+├── tab_enforcer.py          # Walking tab-bar overlay & tab closing logic
 ├── speech.py                # Audio playback & line shuffle logic
-├── generate_audio.py        # Offline generator for voice clips (optional)
+├── build_orange_sprites.py  # Generates walking frames for orange character
+├── generate_audio.py        # Offline generator for voice clips
 ├── requirements.txt         # Python dependencies
 └── README.md                # Documentation (this file)
 ```
