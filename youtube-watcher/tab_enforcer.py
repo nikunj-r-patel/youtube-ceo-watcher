@@ -2,17 +2,22 @@ import tkinter as tk
 from PIL import Image, ImageTk, ImageGrab
 import os
 import time
+import math
 import threading
 import ctypes
 import win32gui
 import win32con
 
 # -------------------------------------------------------------
-# 👃 Orange Tab Enforcer — Precise 'X' Target & Nose-Pinch Action
+# 🎯 Professional 60 FPS Tab Enforcer — Nose-Pinch Tab Closer
+# Clean, box-free, fluid animation built for demos & social media
 # -------------------------------------------------------------
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 FRAMES_DIR = os.path.join(ASSETS_DIR, "orange_frames")
+
+# 60 FPS tick duration in milliseconds
+TICK_MS = 16
 
 # Windows Virtual Keys for Ctrl + W
 VK_CONTROL = 0x11
@@ -24,7 +29,7 @@ def send_ctrl_w():
     user32 = ctypes.windll.user32
     user32.keybd_event(VK_CONTROL, 0, 0, 0)
     user32.keybd_event(VK_W, 0, 0, 0)
-    time.sleep(0.05)
+    time.sleep(0.04)
     user32.keybd_event(VK_W, 0, KEYEVENTF_KEYUP, 0)
     user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
@@ -53,7 +58,6 @@ def pinpoint_youtube_x_button(hwnd, win_left, win_top, win_w):
                 r = t.CurrentBoundingRectangle
                 x_center = r.right - 18
                 y_center = r.top + (r.bottom - r.top) // 2
-                print(f"🎯 UIAutomation pinpointed 'X' icon at: ({x_center}, {y_center})")
                 return x_center, y_center
     except Exception:
         pass
@@ -69,7 +73,6 @@ def pinpoint_youtube_x_button(hwnd, win_left, win_top, win_w):
         for x in range(sw):
             for y in range(sh):
                 r, g, b = strip.getpixel((x, y))[:3]
-                # YouTube Play red
                 if r > 185 and g < 45 and b < 45:
                     red_spots.append((x, y))
 
@@ -77,7 +80,6 @@ def pinpoint_youtube_x_button(hwnd, win_left, win_top, win_w):
             logo_x = int(sum(p[0] for p in red_spots) / len(red_spots))
             logo_y = int(sum(p[1] for p in red_spots) / len(red_spots))
 
-            # Scan rightwards for the bright 'X' icon pixels
             x_candidates = []
             for scan_x in range(logo_x + 50, min(sw - 10, logo_x + 150)):
                 for scan_y in range(max(0, logo_y - 12), min(sh, logo_y + 12)):
@@ -92,15 +94,13 @@ def pinpoint_youtube_x_button(hwnd, win_left, win_top, win_w):
 
             exact_screen_x = win_left + best_rel_x
             exact_screen_y = tab_strip_top + logo_y
-            print(f"🎯 Visual detection pinpointed 'X' icon at: ({exact_screen_x}, {exact_screen_y})")
             return exact_screen_x, exact_screen_y
-    except Exception as e:
-        print(f"Tab pinpointer visual note: {e}")
+    except Exception:
+        pass
 
-    # Method 3: Geometric fallback for active tab on the right
+    # Method 3: Calculated fallback
     exact_screen_x = win_left + int(win_w * 0.962)
     exact_screen_y = win_top + 24
-    print(f"🎯 Calculated fallback pinpointed 'X' icon at: ({exact_screen_x}, {exact_screen_y})")
     return exact_screen_x, exact_screen_y
 
 
@@ -118,10 +118,10 @@ class OrangeTabEnforcer:
         self.root.wm_attributes("-transparentcolor", "white")
         self.root.config(bg="white")
         
-        # Calculate overlay geometry
+        # Calculate overlay dimensions
         self._calculate_geometry()
         
-        # Canvas for sprite, impact, and speech bubble
+        # Canvas for character and impact FX
         self.canvas = tk.Canvas(
             self.root,
             width=self.win_w,
@@ -131,46 +131,42 @@ class OrangeTabEnforcer:
         )
         self.canvas.pack(fill="both", expand=True)
         
-        # Load crisp frames (all have 100% clean binary transparency, no halos)
+        # Load all crisp, distortion-free frames
         self._load_frames()
         
-        # Sprite dimensions & nose tip offset inside nose_impact.png
-        # nose_impact.png size is 72x52; tip is at (x=43, y=48)
+        # Character dimensions & nose offset
         self.char_w = 56
         self.char_h = 52
         self.nose_offset_x = 43
         self.nose_offset_y = 48
         
-        # Start on the LEFT side of the tab strip
-        self.current_x = 10
-        self.base_y = 12
+        # Position states
+        self.current_x = -50.0  # Start just off the left edge for a clean entrance
+        self.base_y = 10.0
         self.current_y = self.base_y
         
-        # Pinpoint EXACT 'X' button coordinate
+        # Pinpoint exact 'X' button location
         screen_target_x, screen_target_y = pinpoint_youtube_x_button(
             self.hwnd, self.win_x, self.win_y, self.win_w
         )
-        
-        # Target coordinate relative to overlay
         self.target_x = screen_target_x - self.win_x
         self.target_y = max(18, min(self.win_h - 15, screen_target_y - self.win_y))
         
-        # Character walk stop X (stop right before the X icon so nose aligns)
+        # Stop point for walking right
         self.walk_stop_x = self.target_x - self.char_w + 4
         
-        self.walk_step = 0
-        self.exit_step = 0
         self.is_running = True
+        self.walk_distance = 0.0
         
-        # Start walking right after brief initial pause
-        self.root.after(100, self._start_walk_right)
+        # Start smooth 60fps walk loop
+        self.root.after(50, self._tick_walk_right)
 
     def _calculate_geometry(self):
         screen_w = self.root.winfo_screenwidth()
         self.win_x = 0
         self.win_y = 0
         self.win_w = screen_w
-        self.win_h = 105
+        self.win_h = 110  # Height for jump arc
         
         if self.hwnd and win32gui.IsWindow(self.hwnd):
             try:
@@ -186,167 +182,180 @@ class OrangeTabEnforcer:
         self.root.geometry(f"{self.win_w}x{self.win_h}+{self.win_x}+{self.win_y}")
 
     def _load_frames(self):
-        """Load razor-sharp, zero-distortion frames with leg walking animations."""
+        """Load 100% binary-clean animation frames."""
         self.frames = {}
-        frame_names = [
+        names = [
             "walk_r1", "walk_r2", "walk_r3", "walk_r4",
             "walk_l1", "walk_l2", "walk_l3", "walk_l4",
             "stand_aim", "jump_up", "nose_down", "nose_impact", "celebrate"
         ]
-        for name in frame_names:
-            path = os.path.join(FRAMES_DIR, f"{name}.png")
-            if os.path.exists(path):
-                img = Image.open(path).convert("RGBA")
+        for name in names:
+            p = os.path.join(FRAMES_DIR, f"{name}.png")
+            if os.path.exists(p):
+                img = Image.open(p).convert("RGBA")
                 self.frames[name] = ImageTk.PhotoImage(img)
 
-    def _draw_frame(self, frame_name, x, y, bubble_text="", impact=False):
-        """Render sprite, comic speech bubble, and impact star with pixel perfection."""
+    def _render(self, frame_name, x, y, impact_radius=0):
+        """Render pure sprite and optional impact shockwave without ANY text boxes."""
         self.canvas.delete("all")
         photo = self.frames.get(frame_name, self.frames.get("walk_r1"))
         
-        # 1. Comic Speech Bubble
-        if bubble_text:
-            bx = x + 30
-            by = max(14, y - 8)
-            self.canvas.create_rectangle(
-                bx - 35, by - 14, bx + 55, by + 4,
-                fill="#FF4500", outline="#8B0000", width=1.5
-            )
-            self.canvas.create_text(
-                bx + 10, by - 5,
-                text=bubble_text,
-                fill="white",
-                font=("Arial", 8, "bold")
-            )
+        # Clean expanding shockwave ring on impact
+        if impact_radius > 0:
+            cx = self.target_x
+            cy = self.target_y
+            r = impact_radius
+            # Double concentric shockwave rings
+            self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, outline="#FF4500", width=2)
+            self.canvas.create_oval(cx - r*0.6, cy - r*0.6, cx + r*0.6, cy + r*0.6, outline="#FFD700", width=2)
             
-        # 2. Comic impact burst EXACTLY on the X button!
-        if impact:
-            ix = self.target_x
-            iy = self.target_y
-            points = [
-                ix, iy - 16,
-                ix + 5, iy - 6,
-                ix + 18, iy - 8,
-                ix + 8, iy + 2,
-                ix + 15, iy + 14,
-                ix + 2, iy + 8,
-                ix - 6, iy + 18,
-                ix - 5, iy + 6,
-                ix - 18, iy + 8,
-                ix - 7, iy - 2,
-                ix - 14, iy - 10,
-                ix - 2, iy - 6,
-            ]
-            self.canvas.create_polygon(points, fill="#FFFF00", outline="#FF4500", width=2)
-            # Red bullseye ring on the X
-            self.canvas.create_oval(ix - 8, iy - 8, ix + 8, iy + 8, outline="#FF0000", width=2)
-            self.canvas.create_text(ix, iy - 20, text="PINCH! 💥", fill="#D00000", font=("Arial", 10, "bold"))
-            
-        # 3. Draw Character Sprite
+        # Draw pure character sprite
         if photo:
-            self.canvas.create_image(x, y, anchor="nw", image=photo)
+            self.canvas.create_image(int(x), int(y), anchor="nw", image=photo)
 
-    def _start_walk_right(self):
-        """Walk smoothly from LEFT to RIGHT towards the YouTube tab with moving legs."""
+    def _tick_walk_right(self):
+        """Smooth 60 FPS walk from LEFT towards the YouTube tab."""
         if not self.is_running:
             return
             
         if self.current_x < self.walk_stop_x:
-            self.current_x += 5
-            self.walk_step += 1
+            # 3.2 pixels per 16ms = ~200px per second (natural walking speed)
+            self.current_x += 3.2
+            self.walk_distance += 3.2
             
-            # Leg-walking frames (r1 -> r2 -> r3 -> r4)
-            walk_frame = f"walk_r{(self.walk_step % 4) + 1}"
+            # True leg walking stride: 1 step every 16px walked
+            stride_idx = int((self.walk_distance / 16)) % 4 + 1
+            frame = f"walk_r{stride_idx}"
             
-            # Subtle natural stride bobbing
-            bob = -2 if (self.walk_step % 2 == 1) else 0
+            # Subtle natural stride bob (1.5px sine wave)
+            bob = -1.5 * abs(math.sin(self.walk_distance * 0.15))
             self.current_y = self.base_y + bob
             
-            msg = "Targeting [X]..." if (self.walk_step % 6 < 3) else "No YouTube! 🛑"
-            self._draw_frame(walk_frame, self.current_x, self.current_y, msg)
-            
-            self.root.after(30, self._start_walk_right)
+            self._render(frame, self.current_x, self.current_y)
+            self.root.after(TICK_MS, self._tick_walk_right)
         else:
-            # Reached exact position! Stop, jump, and land on nose!
-            self._stop_jump_and_land_on_nose()
+            # Reached destination! Initiate cinematic jump & nose slam
+            self._execute_cinematic_nose_slam()
 
-    def _stop_jump_and_land_on_nose(self):
+    def _execute_cinematic_nose_slam(self):
         """
-        1. STOPS directly at the X icon (clear pause).
-        2. JUMPS high up into the air above the X icon.
-        3. Flips and LANDS ON ITS NOSE EXACTLY in the center of the X icon!
-        4. Fires Ctrl+W to close tab.
-        5. Celebrates briefly.
-        6. Turns around and WALKS ALL THE WAY TO THE LEFT OUT OF SCREEN!
+        Smooth Parabolic Nose Slam Sequence:
+        1. Anticipation: Quick pause & crouch at the X button (100ms)
+        2. Parabolic Launch: Smooth jump curve up into the air (240ms)
+        3. Nose Spear Dive: Plummets nose-first into the exact center of [X] (120ms)
+        4. Impact & Shockwave: Expands energy ring, closes tab (180ms)
+        5. Victory & Left Exit: Walks smoothly off-screen to the left (60 FPS)
         """
-        # Step 1: STOP at the X icon
-        self._draw_frame("stand_aim", self.walk_stop_x, self.base_y, "TARGET LOCKED! 🎯")
+        # Step 1: Stop cleanly at the target
+        self.current_x = self.walk_stop_x
+        self._render("stand_aim", self.current_x, self.base_y)
         
-        def do_jump():
-            # Step 2: JUMP high up into the air directly above the X icon
-            jump_draw_x = self.target_x - (self.char_w // 2)
-            self._draw_frame("jump_up", jump_draw_x, self.base_y - 28, "JUMPING! 🚀")
-            self.root.after(220, do_land_on_nose)
+        def start_jump():
+            # Step 2: Parabolic Jump Arc (60 FPS physics)
+            jump_start_time = time.time()
+            jump_duration = 0.28  # 280ms arc
+            apex_height = 36.0    # 36px high jump
             
-        def do_land_on_nose():
-            # Step 3: LAND ON NOSE directly onto the center of the X icon!
-            # Sprite tip is at (43, 48) inside nose_impact.png
-            # Drawing at (target_x - 43, target_y - 48) places the nose tip EXACTLY AT (target_x, target_y)!
-            impact_draw_x = self.target_x - self.nose_offset_x
-            impact_draw_y = self.target_y - self.nose_offset_y
-            self._draw_frame("nose_impact", impact_draw_x, impact_draw_y, impact=True)
+            def tick_jump():
+                if not self.is_running:
+                    return
+                elapsed = time.time() - jump_start_time
+                progress = min(1.0, elapsed / jump_duration)
+                
+                # Sine curve for natural gravity arc: 0 -> peak -> down
+                arc = math.sin(progress * math.pi)
+                y = self.base_y - (arc * apex_height)
+                
+                # Center sprite horizontally above the target
+                char_x = self.target_x - (self.char_w // 2)
+                
+                if progress < 0.65:
+                    # Going up: jump_up pose
+                    self._render("jump_up", char_x, y)
+                    self.root.after(TICK_MS, tick_jump)
+                elif progress < 1.0:
+                    # Near peak & turning down: nose pointing straight down
+                    self._render("nose_down", char_x, y)
+                    self.root.after(TICK_MS, tick_jump)
+                else:
+                    # Step 3: Trigger Nose Impact right on the X button!
+                    trigger_impact()
+                    
+            tick_jump()
             
-            # Step 4: Focus browser window and send Ctrl+W to close YouTube tab!
+        def trigger_impact():
+            # Step 4: Nose lands directly on center of the X button!
+            impact_x = self.target_x - self.nose_offset_x
+            impact_y = self.target_y - self.nose_offset_y
+            
+            # Send Ctrl+W to close tab
             if self.hwnd and win32gui.IsWindow(self.hwnd):
                 try:
                     win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
                     win32gui.SetForegroundWindow(self.hwnd)
                 except Exception:
                     pass
-                    
-            time.sleep(0.06)
             send_ctrl_w()
-            print(f"💥 NOSE PINCHED EXACTLY ON CENTER OF [X] ({self.target_x}, {self.target_y})! Tab closed!")
+            print("💥 NOSE HIT CENTER OF [X]! YouTube tab closed cleanly!")
             
-            # Step 5: Celebrate briefly
-            self.root.after(350, do_celebrate)
+            # Animate expanding shockwave over 180ms
+            fx_start = time.time()
+            def tick_shockwave():
+                elapsed = time.time() - fx_start
+                if elapsed < 0.18:
+                    radius = 4 + (elapsed / 0.18) * 22
+                    self._render("nose_impact", impact_x, impact_y, impact_radius=radius)
+                    self.root.after(TICK_MS, tick_shockwave)
+                else:
+                    # Celebrate pose
+                    celebrate()
+                    
+            tick_shockwave()
             
-        def do_celebrate():
-            celeb_draw_x = self.target_x - (self.char_w // 2)
-            self._draw_frame("celebrate", celeb_draw_x, self.base_y - 6, "PINCHED ON [X]! 👃🎉")
-            # Step 6: After celebrating 700ms, turn left and walk off screen!
-            self.root.after(700, self._start_walk_left_exit)
+        def celebrate():
+            # Step 5: Brief standing victory pose
+            celeb_x = self.target_x - (self.char_w // 2)
+            self._render("celebrate", celeb_x, self.base_y - 4)
+            # After 500ms, start walking left off-screen
+            self.root.after(500, self._start_exit_left)
+            
+        # 100ms anticipation pause before leaping
+        self.root.after(100, start_jump)
 
-        # Stop for 350ms so user clearly sees the character standing at the X, then jump!
-        self.root.after(350, do_jump)
-
-    def _start_walk_left_exit(self):
-        """Turn around, face LEFT, and walk with leg animation all the way off-screen!"""
-        if not self.is_running:
-            return
-
-        if self.current_x > -70:
-            self.current_x -= 6
-            self.exit_step += 1
-
-            # Leg-walking frames facing left (l1 -> l2 -> l3 -> l4)
-            walk_frame = f"walk_l{(self.exit_step % 4) + 1}"
-            bob = -2 if (self.exit_step % 2 == 1) else 0
-            self.current_y = self.base_y + bob
-
-            msg = "Back to work! 👋" if self.current_x > 100 else ""
-            self._draw_frame(walk_frame, self.current_x, self.current_y, msg)
-
-            self.root.after(30, self._start_walk_left_exit)
-        else:
-            # Fully off-screen on the left! Close overlay
-            self.is_running = False
-            try:
-                self.root.destroy()
-            except Exception:
-                pass
-            if self.on_finished:
-                self.on_finished()
+    def _start_exit_left(self):
+        """Walk smoothly off the left side of the screen at 60 FPS."""
+        self.exit_distance = 0.0
+        self.current_x = self.target_x - (self.char_w // 2)
+        
+        def tick_exit():
+            if not self.is_running:
+                return
+                
+            if self.current_x > -70:
+                # 3.8px per tick (brisk strut exit)
+                self.current_x -= 3.8
+                self.exit_distance += 3.8
+                
+                # Leg movement cycling for walking left
+                stride_idx = int((self.exit_distance / 16)) % 4 + 1
+                frame = f"walk_l{stride_idx}"
+                
+                bob = -1.5 * abs(math.sin(self.exit_distance * 0.15))
+                y = self.base_y + bob
+                
+                self._render(frame, self.current_x, y)
+                self.root.after(TICK_MS, tick_exit)
+            else:
+                # Completely off-screen! Clean shutdown
+                self.is_running = False
+                try:
+                    self.root.destroy()
+                except Exception:
+                    pass
+                if self.on_finished:
+                    self.on_finished()
+                    
+        tick_exit()
 
 
 def trigger_tab_enforcer(hwnd=None, on_finished=None):
@@ -354,6 +363,6 @@ def trigger_tab_enforcer(hwnd=None, on_finished=None):
 
 
 if __name__ == "__main__":
-    print("Testing Tab Enforcer with exact nose-pinch targeting...")
+    print("Testing Professional 60 FPS Tab Enforcer...")
     app = OrangeTabEnforcer()
     app.root.mainloop()

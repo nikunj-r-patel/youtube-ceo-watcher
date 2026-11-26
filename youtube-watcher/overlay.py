@@ -139,25 +139,25 @@ class CEOOverlay:
         # Draw static image initially
         self._draw_frame(self.base_img)
 
-        # Container for the speech bubble with border
+        # Sleek executive badge container
         bubble_frame = tk.Frame(
             self.root,
-            bg="#8B0000",   # Dark red border
-            padx=2, pady=2
+            bg="#33333D",   # Refined dark border
+            padx=1, pady=1
         )
-        bubble_frame.pack(fill="x", padx=4, pady=(2, 0))
+        bubble_frame.pack(fill="x", padx=8, pady=(4, 0))
 
-        # Yellow speech bubble
+        # Premium dark badge with crisp gold CEO typography
         self.text_label = tk.Label(
             bubble_frame,
             text="",
-            bg="#FFD700",
-            fg="#8B0000",
-            font=("Arial", 9, "bold"),
-            wraplength=310,
+            bg="#16161D",
+            fg="#FFD700",
+            font=("Segoe UI", 9, "bold"),
+            wraplength=300,
             justify="center",
-            pady=8,
-            padx=6
+            pady=7,
+            padx=8
         )
         self.text_label.pack(fill="both", expand=True)
         self.text_label.bind("<Button-1>", lambda e: self.slide_out())
