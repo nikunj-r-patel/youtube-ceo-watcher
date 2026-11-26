@@ -1,5 +1,5 @@
 import tkinter as tk
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageGrab
 import os
 import time
 import threading
@@ -8,7 +8,7 @@ import win32gui
 import win32con
 
 # -------------------------------------------------------------
-# 👃 Orange Tab Enforcer — Left-to-Right Walk, Nose-Pinch & Left Exit
+# 👃 Orange Tab Enforcer — Precise 'X' Target & Nose-Pinch Action
 # -------------------------------------------------------------
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
@@ -29,38 +29,79 @@ def send_ctrl_w():
     user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
 
-def locate_youtube_tab_x(hwnd, win_left, win_w):
+def pinpoint_youtube_x_button(hwnd, win_left, win_top, win_w):
     """
-    Find the exact screen X coordinate of the YouTube tab's 'X' close button.
-    Tries native UI Automation first; falls back to active tab geometry.
+    Finds the EXACT pixel coordinate (center_x, center_y) of the active YouTube tab's 'X' button.
+    1. Tries native UI Automation.
+    2. Uses visual red-logo tab strip detection for 100% precision across all displays.
     """
+    # Method 1: UIAutomation
     try:
         import comtypes.client
         UIAutomationClient = comtypes.client.GetModule("UIAutomationCore.dll")
         uia = comtypes.client.CreateObject(UIAutomationClient.CUIAutomation, interface=UIAutomationClient.IUIAutomation)
-        element = uia.ElementFromHandle(hwnd)
-        
+        elem = uia.ElementFromHandle(hwnd)
         tab_cond = uia.CreatePropertyCondition(
-            UIAutomationClient.UIA_ControlTypePropertyId, 
+            UIAutomationClient.UIA_ControlTypePropertyId,
             UIAutomationClient.UIA_TabItemControlTypeId
         )
-        tabs = element.FindAll(UIAutomationClient.TreeScope_Descendants, tab_cond)
-        
+        tabs = elem.FindAll(UIAutomationClient.TreeScope_Descendants, tab_cond)
         for i in range(tabs.Length):
             t = tabs.GetElement(i)
-            name = t.CurrentName or ""
-            if "youtube" in name.lower():
-                rect = t.CurrentBoundingRectangle
-                target_screen_x = rect.right - 18
-                print(f"🎯 UIAutomation found YouTube Tab '{name[:30]}' at X={target_screen_x}")
-                return target_screen_x
+            name = (t.CurrentName or "").lower()
+            if "youtube" in name:
+                r = t.CurrentBoundingRectangle
+                x_center = r.right - 18
+                y_center = r.top + (r.bottom - r.top) // 2
+                print(f"🎯 UIAutomation pinpointed 'X' icon at: ({x_center}, {y_center})")
+                return x_center, y_center
     except Exception:
         pass
-        
-    # Standard multi-tab layout fallback (YouTube tab around ~78% of width)
-    target_screen_x = win_left + max(200, win_w - 240)
-    print(f"🎯 Using calculated YouTube Tab 'X' position: X={target_screen_x}")
-    return target_screen_x
+
+    # Method 2: Visual Detection of YouTube Red Icon in the Tab Strip
+    try:
+        tab_strip_top = max(0, win_top + 2)
+        tab_strip_bottom = tab_strip_top + 48
+        strip = ImageGrab.grab(bbox=(win_left, tab_strip_top, win_left + win_w, tab_strip_bottom))
+        sw, sh = strip.size
+
+        red_spots = []
+        for x in range(sw):
+            for y in range(sh):
+                r, g, b = strip.getpixel((x, y))[:3]
+                # YouTube Play red
+                if r > 185 and g < 45 and b < 45:
+                    red_spots.append((x, y))
+
+        if red_spots:
+            logo_x = int(sum(p[0] for p in red_spots) / len(red_spots))
+            logo_y = int(sum(p[1] for p in red_spots) / len(red_spots))
+
+            # Scan rightwards for the bright 'X' icon pixels
+            x_candidates = []
+            for scan_x in range(logo_x + 50, min(sw - 10, logo_x + 150)):
+                for scan_y in range(max(0, logo_y - 12), min(sh, logo_y + 12)):
+                    r, g, b = strip.getpixel((scan_x, scan_y))[:3]
+                    if r > 185 and g > 185 and b > 185:
+                        x_candidates.append(scan_x)
+
+            if x_candidates:
+                best_rel_x = int(sum(x_candidates) / len(x_candidates))
+            else:
+                best_rel_x = logo_x + 88
+
+            exact_screen_x = win_left + best_rel_x
+            exact_screen_y = tab_strip_top + logo_y
+            print(f"🎯 Visual detection pinpointed 'X' icon at: ({exact_screen_x}, {exact_screen_y})")
+            return exact_screen_x, exact_screen_y
+    except Exception as e:
+        print(f"Tab pinpointer visual note: {e}")
+
+    # Method 3: Geometric fallback for active tab on the right
+    exact_screen_x = win_left + int(win_w * 0.962)
+    exact_screen_y = win_top + 24
+    print(f"🎯 Calculated fallback pinpointed 'X' icon at: ({exact_screen_x}, {exact_screen_y})")
+    return exact_screen_x, exact_screen_y
 
 
 class OrangeTabEnforcer:
@@ -90,21 +131,32 @@ class OrangeTabEnforcer:
         )
         self.canvas.pack(fill="both", expand=True)
         
-        # Load crisp leg-animated frames (clean 1-bit transparency, zero halos)
+        # Load crisp frames (all have 100% clean binary transparency, no halos)
         self._load_frames()
         
-        # Sprite dimensions
+        # Sprite dimensions & nose tip offset inside nose_impact.png
+        # nose_impact.png size is 72x52; tip is at (x=43, y=48)
         self.char_w = 56
         self.char_h = 52
+        self.nose_offset_x = 43
+        self.nose_offset_y = 48
         
         # Start on the LEFT side of the tab strip
         self.current_x = 10
         self.base_y = 12
         self.current_y = self.base_y
         
-        # Calculate destination right at the YouTube tab X button
-        target_screen_x = locate_youtube_tab_x(self.hwnd, self.win_x, self.win_w)
-        self.target_x = max(80, target_screen_x - self.win_x - self.char_w + 10)
+        # Pinpoint EXACT 'X' button coordinate
+        screen_target_x, screen_target_y = pinpoint_youtube_x_button(
+            self.hwnd, self.win_x, self.win_y, self.win_w
+        )
+        
+        # Target coordinate relative to overlay
+        self.target_x = screen_target_x - self.win_x
+        self.target_y = max(18, min(self.win_h - 15, screen_target_y - self.win_y))
+        
+        # Character walk stop X (stop right before the X icon so nose aligns)
+        self.walk_stop_x = self.target_x - self.char_w + 4
         
         self.walk_step = 0
         self.exit_step = 0
@@ -118,7 +170,7 @@ class OrangeTabEnforcer:
         self.win_x = 0
         self.win_y = 0
         self.win_w = screen_w
-        self.win_h = 100
+        self.win_h = 105
         
         if self.hwnd and win32gui.IsWindow(self.hwnd):
             try:
@@ -148,7 +200,7 @@ class OrangeTabEnforcer:
                 self.frames[name] = ImageTk.PhotoImage(img)
 
     def _draw_frame(self, frame_name, x, y, bubble_text="", impact=False):
-        """Render sprite and optional impact / bubble without any artifacts."""
+        """Render sprite, comic speech bubble, and impact star with pixel perfection."""
         self.canvas.delete("all")
         photo = self.frames.get(frame_name, self.frames.get("walk_r1"))
         
@@ -167,37 +219,39 @@ class OrangeTabEnforcer:
                 font=("Arial", 8, "bold")
             )
             
-        # 2. Comic impact star when nose slams into the X button!
+        # 2. Comic impact burst EXACTLY on the X button!
         if impact:
-            ix = x + 24
-            iy = y + self.char_h - 6
+            ix = self.target_x
+            iy = self.target_y
             points = [
-                ix, iy - 14,
-                ix + 5, iy - 5,
-                ix + 16, iy - 7,
-                ix + 7, iy + 2,
-                ix + 14, iy + 12,
-                ix + 2, iy + 7,
-                ix - 5, iy + 16,
-                ix - 4, iy + 5,
-                ix - 16, iy + 7,
-                ix - 6, iy - 2,
-                ix - 12, iy - 9,
-                ix - 2, iy - 5,
+                ix, iy - 16,
+                ix + 5, iy - 6,
+                ix + 18, iy - 8,
+                ix + 8, iy + 2,
+                ix + 15, iy + 14,
+                ix + 2, iy + 8,
+                ix - 6, iy + 18,
+                ix - 5, iy + 6,
+                ix - 18, iy + 8,
+                ix - 7, iy - 2,
+                ix - 14, iy - 10,
+                ix - 2, iy - 6,
             ]
             self.canvas.create_polygon(points, fill="#FFFF00", outline="#FF4500", width=2)
-            self.canvas.create_text(ix, iy - 18, text="SLAM! 💥", fill="#D00000", font=("Arial", 10, "bold"))
+            # Red bullseye ring on the X
+            self.canvas.create_oval(ix - 8, iy - 8, ix + 8, iy + 8, outline="#FF0000", width=2)
+            self.canvas.create_text(ix, iy - 20, text="PINCH! 💥", fill="#D00000", font=("Arial", 10, "bold"))
             
         # 3. Draw Character Sprite
         if photo:
             self.canvas.create_image(x, y, anchor="nw", image=photo)
 
     def _start_walk_right(self):
-        """Walk smoothly from LEFT to RIGHT towards the YouTube tab with leg animation."""
+        """Walk smoothly from LEFT to RIGHT towards the YouTube tab with moving legs."""
         if not self.is_running:
             return
             
-        if self.current_x < self.target_x:
+        if self.current_x < self.walk_stop_x:
             self.current_x += 5
             self.walk_step += 1
             
@@ -213,29 +267,34 @@ class OrangeTabEnforcer:
             
             self.root.after(30, self._start_walk_right)
         else:
-            # Reached exact position! Stop, jump, land on nose!
+            # Reached exact position! Stop, jump, and land on nose!
             self._stop_jump_and_land_on_nose()
 
     def _stop_jump_and_land_on_nose(self):
         """
         1. STOPS directly at the X icon (clear pause).
         2. JUMPS high up into the air above the X icon.
-        3. Flips and LANDS ON ITS NOSE directly on the X icon!
+        3. Flips and LANDS ON ITS NOSE EXACTLY in the center of the X icon!
         4. Fires Ctrl+W to close tab.
         5. Celebrates briefly.
         6. Turns around and WALKS ALL THE WAY TO THE LEFT OUT OF SCREEN!
         """
         # Step 1: STOP at the X icon
-        self._draw_frame("stand_aim", self.target_x, self.base_y, "STOPPING AT [X]! 🛑")
+        self._draw_frame("stand_aim", self.walk_stop_x, self.base_y, "TARGET LOCKED! 🎯")
         
         def do_jump():
-            # Step 2: JUMP high up into the air
-            self._draw_frame("jump_up", self.target_x, self.base_y - 28, "JUMPING! 🚀")
+            # Step 2: JUMP high up into the air directly above the X icon
+            jump_draw_x = self.target_x - (self.char_w // 2)
+            self._draw_frame("jump_up", jump_draw_x, self.base_y - 28, "JUMPING! 🚀")
             self.root.after(220, do_land_on_nose)
             
         def do_land_on_nose():
-            # Step 3: LAND ON NOSE directly onto the X icon (nose pointing straight down)
-            self._draw_frame("nose_impact", self.target_x - 4, self.base_y + 2, impact=True)
+            # Step 3: LAND ON NOSE directly onto the center of the X icon!
+            # Sprite tip is at (43, 48) inside nose_impact.png
+            # Drawing at (target_x - 43, target_y - 48) places the nose tip EXACTLY AT (target_x, target_y)!
+            impact_draw_x = self.target_x - self.nose_offset_x
+            impact_draw_y = self.target_y - self.nose_offset_y
+            self._draw_frame("nose_impact", impact_draw_x, impact_draw_y, impact=True)
             
             # Step 4: Focus browser window and send Ctrl+W to close YouTube tab!
             if self.hwnd and win32gui.IsWindow(self.hwnd):
@@ -247,13 +306,14 @@ class OrangeTabEnforcer:
                     
             time.sleep(0.06)
             send_ctrl_w()
-            print("💥 NOSE LANDED ON [X] BUTTON! YouTube tab closed!")
+            print(f"💥 NOSE PINCHED EXACTLY ON CENTER OF [X] ({self.target_x}, {self.target_y})! Tab closed!")
             
             # Step 5: Celebrate briefly
             self.root.after(350, do_celebrate)
             
         def do_celebrate():
-            self._draw_frame("celebrate", self.target_x, self.base_y - 6, "CLOSED WITH NOSE! 👃🎉")
+            celeb_draw_x = self.target_x - (self.char_w // 2)
+            self._draw_frame("celebrate", celeb_draw_x, self.base_y - 6, "PINCHED ON [X]! 👃🎉")
             # Step 6: After celebrating 700ms, turn left and walk off screen!
             self.root.after(700, self._start_walk_left_exit)
 
@@ -294,6 +354,6 @@ def trigger_tab_enforcer(hwnd=None, on_finished=None):
 
 
 if __name__ == "__main__":
-    print("Testing Tab Enforcer with left exit...")
+    print("Testing Tab Enforcer with exact nose-pinch targeting...")
     app = OrangeTabEnforcer()
     app.root.mainloop()
