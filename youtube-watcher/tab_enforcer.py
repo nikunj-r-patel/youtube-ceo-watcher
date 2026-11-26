@@ -137,7 +137,7 @@ class OrangeTabEnforcer:
         # Character dimensions & nose offset
         self.char_w = 56
         self.char_h = 52
-        self.nose_offset_x = 43
+        self.nose_offset_x = 46
         self.nose_offset_y = 48
         
         # Position states

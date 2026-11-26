@@ -31,17 +31,21 @@ def get_work_area():
         return 0, 0, 1920, 1040
 
 def clean_binary_alpha(img, threshold=140):
-    """Ensure image has crisp 1-bit alpha (0 or 255). Eliminates all distorted borders in Tkinter."""
+    """Ensure image has crisp 1-bit alpha (0 or 255). Protects white eye sclera so eyes never become black dots."""
     img = img.convert("RGBA")
     w, h = img.size
     pixels = img.load()
     for y in range(h):
         for x in range(w):
             r, g, b, a = pixels[x, y]
-            if a < threshold or (r > 240 and g > 240 and b > 240):
+            if a < threshold:
                 pixels[x, y] = (255, 255, 255, 0)
             else:
-                pixels[x, y] = (r, g, b, 255)
+                # Protect whites of the eyes from Tkinter's colorkey transparency
+                if r >= 254 and g >= 254 and b >= 254:
+                    pixels[x, y] = (254, 254, 254, 255)
+                else:
+                    pixels[x, y] = (r, g, b, 255)
     return img
 
 
