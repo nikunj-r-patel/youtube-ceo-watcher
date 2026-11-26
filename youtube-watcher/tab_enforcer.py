@@ -8,7 +8,7 @@ import win32gui
 import win32con
 
 # -------------------------------------------------------------
-# 👃 Orange Tab Enforcer — Razor-Sharp Sprites & Nose-Land Action
+# 👃 Orange Tab Enforcer — Left-to-Right Walk, Nose-Pinch & Left Exit
 # -------------------------------------------------------------
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
@@ -90,7 +90,7 @@ class OrangeTabEnforcer:
         )
         self.canvas.pack(fill="both", expand=True)
         
-        # Load crisp frames (all have 100% clean binary transparency, no halos)
+        # Load crisp leg-animated frames (clean 1-bit transparency, zero halos)
         self._load_frames()
         
         # Sprite dimensions
@@ -107,17 +107,18 @@ class OrangeTabEnforcer:
         self.target_x = max(80, target_screen_x - self.win_x - self.char_w + 10)
         
         self.walk_step = 0
+        self.exit_step = 0
         self.is_running = True
         
-        # Start walking after brief initial pause
-        self.root.after(100, self._start_walk)
+        # Start walking right after brief initial pause
+        self.root.after(100, self._start_walk_right)
 
     def _calculate_geometry(self):
         screen_w = self.root.winfo_screenwidth()
         self.win_x = 0
         self.win_y = 0
         self.win_w = screen_w
-        self.win_h = 100  # Plenty of vertical room for jumping high and landing
+        self.win_h = 100
         
         if self.hwnd and win32gui.IsWindow(self.hwnd):
             try:
@@ -133,10 +134,11 @@ class OrangeTabEnforcer:
         self.root.geometry(f"{self.win_w}x{self.win_h}+{self.win_x}+{self.win_y}")
 
     def _load_frames(self):
-        """Load razor-sharp, zero-distortion frames."""
+        """Load razor-sharp, zero-distortion frames with leg walking animations."""
         self.frames = {}
         frame_names = [
-            "walk_1", "walk_2", "walk_3", "walk_4", 
+            "walk_r1", "walk_r2", "walk_r3", "walk_r4",
+            "walk_l1", "walk_l2", "walk_l3", "walk_l4",
             "stand_aim", "jump_up", "nose_down", "nose_impact", "celebrate"
         ]
         for name in frame_names:
@@ -148,7 +150,7 @@ class OrangeTabEnforcer:
     def _draw_frame(self, frame_name, x, y, bubble_text="", impact=False):
         """Render sprite and optional impact / bubble without any artifacts."""
         self.canvas.delete("all")
-        photo = self.frames.get(frame_name, self.frames.get("walk_1"))
+        photo = self.frames.get(frame_name, self.frames.get("walk_r1"))
         
         # 1. Comic Speech Bubble
         if bubble_text:
@@ -190,41 +192,38 @@ class OrangeTabEnforcer:
         if photo:
             self.canvas.create_image(x, y, anchor="nw", image=photo)
 
-    def _start_walk(self):
-        """Walk smoothly from LEFT to RIGHT towards the YouTube tab."""
+    def _start_walk_right(self):
+        """Walk smoothly from LEFT to RIGHT towards the YouTube tab with leg animation."""
         if not self.is_running:
             return
             
         if self.current_x < self.target_x:
-            # Step forward
-            self.current_x += 6
+            self.current_x += 5
             self.walk_step += 1
             
-            # Alternate walk frames
-            walk_frame = f"walk_{(self.walk_step % 4) + 1}"
+            # Leg-walking frames (r1 -> r2 -> r3 -> r4)
+            walk_frame = f"walk_r{(self.walk_step % 4) + 1}"
             
             # Subtle natural stride bobbing
             bob = -2 if (self.walk_step % 2 == 1) else 0
             self.current_y = self.base_y + bob
             
-            # Cheerful text while approaching
             msg = "Targeting [X]..." if (self.walk_step % 6 < 3) else "No YouTube! 🛑"
             self._draw_frame(walk_frame, self.current_x, self.current_y, msg)
             
-            # Continue walking (30ms per step ≈ ~33fps)
-            self.root.after(30, self._start_walk)
+            self.root.after(30, self._start_walk_right)
         else:
-            # Reached the exact location of the X icon! Stop, jump, and land on nose!
+            # Reached exact position! Stop, jump, land on nose!
             self._stop_jump_and_land_on_nose()
 
     def _stop_jump_and_land_on_nose(self):
         """
-        Precise Action Sequence:
         1. STOPS directly at the X icon (clear pause).
         2. JUMPS high up into the air above the X icon.
         3. Flips and LANDS ON ITS NOSE directly on the X icon!
         4. Fires Ctrl+W to close tab.
-        5. Celebrates!
+        5. Celebrates briefly.
+        6. Turns around and WALKS ALL THE WAY TO THE LEFT OUT OF SCREEN!
         """
         # Step 1: STOP at the X icon
         self._draw_frame("stand_aim", self.target_x, self.base_y, "STOPPING AT [X]! 🛑")
@@ -250,14 +249,37 @@ class OrangeTabEnforcer:
             send_ctrl_w()
             print("💥 NOSE LANDED ON [X] BUTTON! YouTube tab closed!")
             
-            # Step 5: Celebrate
+            # Step 5: Celebrate briefly
             self.root.after(350, do_celebrate)
             
         def do_celebrate():
             self._draw_frame("celebrate", self.target_x, self.base_y - 6, "CLOSED WITH NOSE! 👃🎉")
-            self.root.after(1400, finish)
-            
-        def finish():
+            # Step 6: After celebrating 700ms, turn left and walk off screen!
+            self.root.after(700, self._start_walk_left_exit)
+
+        # Stop for 350ms so user clearly sees the character standing at the X, then jump!
+        self.root.after(350, do_jump)
+
+    def _start_walk_left_exit(self):
+        """Turn around, face LEFT, and walk with leg animation all the way off-screen!"""
+        if not self.is_running:
+            return
+
+        if self.current_x > -70:
+            self.current_x -= 6
+            self.exit_step += 1
+
+            # Leg-walking frames facing left (l1 -> l2 -> l3 -> l4)
+            walk_frame = f"walk_l{(self.exit_step % 4) + 1}"
+            bob = -2 if (self.exit_step % 2 == 1) else 0
+            self.current_y = self.base_y + bob
+
+            msg = "Back to work! 👋" if self.current_x > 100 else ""
+            self._draw_frame(walk_frame, self.current_x, self.current_y, msg)
+
+            self.root.after(30, self._start_walk_left_exit)
+        else:
+            # Fully off-screen on the left! Close overlay
             self.is_running = False
             try:
                 self.root.destroy()
@@ -266,15 +288,12 @@ class OrangeTabEnforcer:
             if self.on_finished:
                 self.on_finished()
 
-        # Stop for 350ms so the user sees the character standing right at the X, then jump!
-        self.root.after(350, do_jump)
-
 
 def trigger_tab_enforcer(hwnd=None, on_finished=None):
     return OrangeTabEnforcer(hwnd=hwnd, on_finished=on_finished)
 
 
 if __name__ == "__main__":
-    print("Testing clean, distortion-free Tab Enforcer...")
+    print("Testing Tab Enforcer with left exit...")
     app = OrangeTabEnforcer()
     app.root.mainloop()

@@ -84,14 +84,14 @@ class YouTubeWatcher:
                         self.warning_count += 1
                         print(f"  🎯 YouTube detected: '{title[:60]}'")
                         
-                        if self.warning_count <= 2:
-                            # Strike 1 or 2: Standard CEO warning
-                            print(f"\n⚠️ WARNING {self.warning_count}/2: CEO is coming to warn you!")
+                        if self.warning_count <= 1:
+                            # Warning 1: Standard CEO warning
+                            print(f"\n⚠️ WARNING {self.warning_count}/1: CEO is coming to warn you!")
                             self._trigger_ceo()
                         else:
-                            # Strike 3+: Escalation! Orange character closes the tab!
-                            print(f"\n🚨 STRIKE {self.warning_count}! CEO warned twice already!")
-                            print("🏃 Orange Tab Enforcer ACTIVATED to close the YouTube tab!")
+                            # Warning 2: Escalation! Orange character closes the tab!
+                            print(f"\n🚨 ESCALATION: CEO already warned! Orange Tab Enforcer ACTIVATED!")
+                            print("🏃 Orange Tab Enforcer is walking to the YouTube tab to close it!")
                             self._trigger_tab_enforcer(hwnd)
                             # Reset count after closing tab so cycle repeats on future infractions
                             self.warning_count = 0
@@ -112,7 +112,7 @@ class YouTubeWatcher:
         """Trigger orange character walking on tab bar to close YouTube tab."""
         def launch():
             # Speak an angry CEO dismissal line concurrently
-            final_line = "THAT IS IT! I warned you TWICE! Tab CLOSED!"
+            final_line = "THAT IS IT! I warned you! Tab CLOSED!"
             threading.Thread(target=lambda: self.speak_fn(final_line), daemon=True).start()
             
             # Launch the walking enforcer on the tab strip

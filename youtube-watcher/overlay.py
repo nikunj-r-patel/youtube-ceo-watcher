@@ -30,6 +30,20 @@ def get_work_area():
         # Fallback to standard 1080p if failed
         return 0, 0, 1920, 1040
 
+def clean_binary_alpha(img, threshold=140):
+    """Ensure image has crisp 1-bit alpha (0 or 255). Eliminates all distorted borders in Tkinter."""
+    img = img.convert("RGBA")
+    w, h = img.size
+    pixels = img.load()
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = pixels[x, y]
+            if a < threshold or (r > 240 and g > 240 and b > 240):
+                pixels[x, y] = (255, 255, 255, 0)
+            else:
+                pixels[x, y] = (r, g, b, 255)
+    return img
+
 
 class CEOOverlay:
     def __init__(self):
@@ -65,7 +79,8 @@ class CEOOverlay:
         # Pre-load base cartoon image
         try:
             raw = Image.open(CARTOON_PATH).convert("RGBA")
-            self.base_img = raw.resize((WINDOW_WIDTH, self.canvas_height), Image.LANCZOS)
+            resized = raw.resize((WINDOW_WIDTH, self.canvas_height), Image.LANCZOS)
+            self.base_img = clean_binary_alpha(resized)
             self._frames = self._build_zoom_frames()
         except Exception as e:
             print(f"Image load error: {e}")
@@ -97,7 +112,7 @@ class CEOOverlay:
             )
             cropped  = self.base_img.crop(crop_box)
             resized  = cropped.resize((img_w, self.canvas_height), Image.LANCZOS)
-            frames.append(resized)
+            frames.append(clean_binary_alpha(resized))
 
         return frames
 
